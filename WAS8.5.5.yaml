@@ -1,0 +1,231 @@
+---
+ - name: Install WAS9056_ND
+   hosts: localhost
+   gather_facts: yes
+   become: yes
+   become_method: sudo
+   vars:
+
+     temp_dir: "/tmp/WAS8.5.5-setup"
+     wasnd_dir_structure:
+       - "{{temp_dir}}/IM_binaries"
+       - "{{temp_dir}}/wasnd_binaries"
+       - "{{temp_dir}}/wasfs_binaries"
+       - "{{temp_dir}}/IHS_binaries"
+       - "{{temp_dir}}/IHSfs_binaries"
+     
+     URL_var: 
+       - "http://192.168.88.130/WAS-Setup" 
+     IM_file: 
+        - "agent.installer.linux.gtk.x86_64_1.9.2005.20230718_1844.zip"
+     Was_file: 
+        - "was.repo.8550.ndtrial_part1.zip"
+        - "was.repo.8550.ndtrial_part2.zip"
+        - "was.repo.8550.ndtrial_part3.zip"
+     WAS_FP_file:
+        - "8.5.5-WS-WAS-FP0000010-part1.zip"
+        - "8.5.5-WS-WAS-FP0000010-part2.zip"
+     IHS_file:
+        - "was.repo.8550.ihs.ilan_part1.zip"
+        - "was.repo.8550.ihs.ilan_part2.zip"
+     IHS_plugin_file:
+        - "was.repo.8550.plg.ilan_part1.zip"
+        - "was.repo.8550.plg.ilan_part2.zip"
+        
+   tasks:
+    - name: Install unzip
+      yum:
+        name: unzip
+        state: installed
+        
+    - name: Install libnsl for OLE-8
+      yum:
+        name: libnsl
+        state: installed
+      when: (ansible_distribution == "OracleLinux" and ansible_distribution_major_version == '8')
+
+    - name: Check to see if WAS is already installed
+      stat: path="/opt/IBM"
+      register: result_was
+
+    - name: Remove IM if it's already installed
+      shell: "{{ item }}"
+      loop:
+        - rm -rf /opt/IBM /opt/IBM.old
+        - rm -rf /var/ibm /var/ibm.old
+        - rm -rf /etc/.ibm /etc/.ibm.old
+      when: result_was.stat.exists
+
+    - name: playtask for Install installtion Manager 
+      block:
+
+        - name: Remove existing directories
+          file:
+            path: "{{ item }}"
+            state: absent
+            force: true
+          with_items:
+            - "{{ wasnd_dir_structure }}"
+ 
+        - name: Create new directories
+          file:
+            path: "{{ item }}"
+            state: directory
+          with_items:
+            - "{{ wasnd_dir_structure }}"
+            - "/opt/IBM"
+                          
+        - name: Download Insallation Manager from Nexus
+          get_url: 
+            url: "http://192.168.88.130/WAS-Setup/IM/{{item}}"
+            dest: "{{temp_dir}}/IM_binaries"
+            tmp_dest: "{{ temp_dir }}/IM_binaries"
+            validate_certs: no
+            owner: root
+            group: root
+            mode: 0775
+          async: 120
+          poll: 05
+          register: IM_register
+          with_items:
+             - "{{IM_file}}"
+
+        - name: finding files matching "goodfile" pattern
+          find:
+              paths: "{{ temp_dir }}/IM_binaries"
+              patterns: '*.zip'
+              file_type: any
+          register: files_found
+
+        - name : get the complete path
+          set_fact:
+             files_found_path: "{{ files_found }}"
+
+        - debug:
+            var: item.path 
+          with_items:
+           - "{{ files_found_path.files }}"
+
+        - name: Extract Insallation Manager to install files
+          unarchive:
+            src: "{{ item.path }}"
+            dest: "{{ temp_dir }}/IM_binaries/"
+            mode: 0755 
+            remote_src: yes
+          with_items:
+             - "{{ files_found_path.files }}"
+
+        - name: Remove IM Zip file
+          file:
+             path: "{{ item.path }}"
+             state: absent
+          with_items:
+            - "{{files_found_path.files }}"
+      delegate_to: localhost
+      run_once: true
+
+
+    - name: playtask for Websphere installtion
+      block:
+        - name: Download Insallation Manager from Nexus
+          get_url: 
+            url: "http://192.168.88.130/WAS-Setup/WAS/{{item}}"
+            dest: "{{temp_dir}}/wasnd_binaries"
+            tmp_dest: "{{ temp_dir }}/wasnd_binaries"
+            validate_certs: no
+            owner: root
+            group: root
+            mode: 0775
+          async: 120
+          poll: 05
+          register: IM_register
+          with_items:
+             - "{{Was_file}}"
+
+        - name: finding files matching "goodfile" pattern
+          find:
+              paths: "{{ temp_dir }}/wasnd_binaries"
+              patterns: '*.zip'
+              file_type: any
+          register: files_found
+
+        - name : get the complete path
+          set_fact:
+             files_found_path: "{{ files_found }}"
+
+        - debug:
+            var: item.path 
+          with_items:
+           - "{{ files_found_path.files }}"
+
+        - name: Extract Insallation Manager to install files
+          unarchive:
+            src: "{{ item.path }}"
+            dest: "{{ temp_dir }}/wasnd_binaries/"
+            mode: 0755 
+            remote_src: yes
+          with_items:
+             - "{{ files_found_path.files }}"
+
+        - name: Remove WASND Zip file
+          file:
+             path: "{{ item.path }}"
+             state: absent
+          with_items:
+            - "{{files_found_path.files }}"
+      delegate_to: localhost
+      run_once: true
+
+
+
+    - name: playtask for Websphere Fix Pack installtion
+      block:
+        - name: Download Websphere Fix Pack from Nexus
+          get_url: 
+            url: "http://192.168.88.130/WAS-Setup/WAS-Fixpacks/{{item}}"
+            dest: "{{temp_dir}}/wasfs_binaries"
+            tmp_dest: "{{ temp_dir }}/wasfs_binaries"
+            validate_certs: no
+            owner: root
+            group: root
+            mode: 0775
+          async: 120
+          poll: 05
+          register: IM_register
+          with_items:
+             - "{{WAS_FP_file}}"
+
+        - name: finding files matching "goodfile" pattern
+          find:
+              paths: "{{ temp_dir }}/wasfs_binaries"
+              patterns: '*.zip'
+              file_type: any
+          register: files_found
+
+        - name : get the complete path
+          set_fact:
+             files_found_path: "{{ files_found }}"
+
+        - debug:
+            var: item.path 
+          with_items:
+           - "{{ files_found_path.files }}"
+
+        - name: Extract Websphere Fix Pack to install files
+          unarchive:
+            src: "{{ item.path }}"
+            dest: "{{ temp_dir }}/wasfs_binaries/"
+            mode: 0755 
+            remote_src: yes
+          with_items:
+             - "{{ files_found_path.files }}"
+
+        - name: Remove WASFS Zip file
+          file:
+             path: "{{ item.path }}"
+             state: absent
+          with_items:
+            - "{{files_found_path.files }}"
+      delegate_to: localhost
+      run_once: true
+
