@@ -1,0 +1,184 @@
+---
+ - name: Install WAS9056_ND
+   hosts: localhost
+   gather_facts: yes
+   become: yes
+   become_method: sudo
+   vars:
+     #Base_dir: "/root/WAS-Setup/"
+     #Was_dir: $Base_dir/WAS
+     #WAS_FP: $Base_dir/WAS-Fixpacks
+     #IHS: $Base_dir/IHS
+     #IHS-plguin: $Base_dir/IHS-Plugin
+     #IM: $Base_dir/IM
+     temp_dir: /tmp
+     IM_file: 
+        - agent.installer.linux.gtk.x86_64_1.9.2005.20230718_1844.zip
+     Was_file: 
+        - was.repo.8550.ndtrial_part1.zip
+        - was.repo.8550.ndtrial_part2.zip
+        - was.repo.8550.ndtrial_part3.zip
+     WAS_FP_file:
+        - 8.5.5-WS-WAS-FP0000010-part1.zip
+        - 8.5.5-WS-WAS-FP0000010-part2.zip
+     IHS_file:
+        - was.repo.8550.ihs.ilan_part1.zip
+        - was.repo.8550.ihs.ilan_part2.zip
+     IHS_plugin_file:
+        - was.repo.8550.plg.ilan_part1.zip
+        - was.repo.8550.plg.ilan_part2.zip
+        
+   tasks:
+    - name: Install unzip
+      yum:
+        name: unzip
+        state: installed
+        
+    - name: Install libnsl for OLE-8
+      yum:
+        name: libnsl
+        state: installed
+      when: (ansible_distribution == "OracleLinux" and ansible_distribution_major_version == '8')
+
+    - name: Check to see if WAS is already installed
+      stat: path="/opt/IBM"
+      register: result_was
+
+    - name: Remove IM if it's already installed
+      shell: "{{ item }}"
+      loop:
+        - rm -rf /opt/IBM /opt/IBM.old
+        - rm -rf /var/ibm /var/ibm.old
+        - rm -rf /etc/.ibm /etc/.ibm.old
+      when: result_was.stat.exists
+
+    - name: Install Websphere 8.5.5 
+      block:
+
+        #- name: Remove existing directories
+        #  file:
+        #    path: "{{ item }}"
+        #    state: absent
+        #    force: true
+        #  loop:
+        #    - "{{ temp_dir }}/WS905_FP6_jdk1.8"      
+        #    - "{{ temp_dir }}/IBM_IM_1.8.8"
+        #    - "{{ temp_dir }}/im-1.8.8.zip"
+        #    - "{{ temp_dir }}/IM"
+        #    - "{{ temp_dir}}/IM_temp"
+        #    - "/opt/IBM/IM"
+        #    - "/opt/IBM"
+        #    - "{{ temp_dir }}/WAS-Fixpack-24"
+        #    - "{{ temp_dir }}/WAS-Fixpack_temp-24"
+ 
+        - name: Create new directories
+          file:
+            path: "{{ item }}"
+            state: directory
+          loop:
+            - "/opt/IBM"
+            - "{{ temp_dir }}"
+            - "{{ temp_dir}}/WAS8.5.5_temp"
+            - "{{ temp_dir}}/WAS8.5.5"
+            - "{{ temp_dir}}/IM_temp"
+            - "{{ temp_dir}}/IM"
+            - "{{ temp_dir }}/WAS-Fixpack-24"
+            - "{{ temp_dir }}/WAS-Fixpack_temp-24"
+                          
+        #- name: Download Insallation Manager from Nexus
+        #  get_url: 
+        #    url: "http://192.168.88.130/was8.5.5/repo/WAS-Setup/IM/{{ item }}"
+        #    dest: "{{ temp_dir }}/IM_temp"
+        #    tmp_dest: "{{ temp_dir }}/IM"
+        #    validate_certs: no
+        #  with_items:
+        #     - "{{ IM_file }}"
+
+        - name: Extract Insallation Manager to install files
+          unarchive:
+            src: "{{ item }}"
+            dest: "{{ temp_dir }}/IM"
+            remote_src: yes
+          with_items:
+             - "{{ temp_dir }}/IM_temp/agent.installer.linux.gtk.x86_64_1.9.2005.20230718_1844.zip"
+
+        #- name: Download Websphere install files
+        #  get_url: 
+        #    url: "http://192.168.88.130/was8.5.5/repo/WAS-Setup/WAS/{{item}}"
+        #    dest: "{{ temp_dir }}/WAS8.5.5_temp"
+        #    tmp_dest: "{{ temp_dir }}/WAS8.5.5"
+        #    validate_certs: no
+        #  with_items:
+        #    - "{{ Was_file }}"
+
+        - name: Extract WAS install files
+          unarchive:
+            src: "{{ item }}"
+            dest: "{{ temp_dir }}/WAS8.5.5"
+            remote_src: yes
+          with_items:
+             - "{{ temp_dir }}/WAS8.5.5_temp/was.repo.8550.ndtrial_part1.zip"
+             - "{{ temp_dir }}/WAS8.5.5_temp/was.repo.8550.ndtrial_part2.zip"
+             - "{{ temp_dir }}/WAS8.5.5_temp/was.repo.8550.ndtrial_part3.zip"
+
+        - name: Accepting License for installtion manager
+          shell: eval {{ temp_dir }}/IM/installc -acceptLicense
+          register: IML_Output
+            
+        - name: Print Install manager's output 
+          debug:
+             var: "{{item.stdout_lines}}"
+          with_items:
+             - "{{ IML_Output }}" 
+       
+        - name: Installing Installation Manger 
+          shell: "{{ item }}"
+          register: IM_Output
+          with_items:
+          - eval {{ temp_dir }}/IM/tools/imcl install com.ibm.cic.agent -repositories {{ temp_dir }}/IM/repository.config -installationDirectory /opt/IBM/instllationManager -acceptLicense -log /tmp/Im_install.log -showProgress 
+
+
+        - name: Showing Websphere Server version
+          shell: "{{ item }}"
+          register: WASServer_Output
+          with_items:
+          - eval {{ temp_dir }}/IM/tools/imcl listAvailablePackages -repositories {{ temp_dir }}/WAS-8.5.5/repository.config -log /tmp/WAS-install.log
+   
+        - name: Installing Websphere
+          shell: "{{ item }}" 
+          register: WASServer_Output1
+          with_items:
+           - eval {{ temp_dir }}/IM/tools/imcl install com.ibm.websphere.NDTRIAL.v85_8.5.5000.20130514_1044 \
+              -repositories {{ temp_dir }}/WAS8.5.5/repository.config \
+              -acceptLicense -showProgress \
+              -log /tmp/WAS-install.log
+
+        #WAS_FP_file
+        #- name: Download Websphere Fix pack files
+        #  get_url:
+        #    url: "http://192.168.88.130/was8.5.5/repo/WAS-Setup/WAS-Fixpacks/{{item}}"
+        #    dest: "{{ temp_dir }}/WAS-Fixpack-24_temp"
+        #    tmp_dest: "{{ temp_dir }}/WAS-Fixpack-24"
+        #    validate_certs: no
+        #  with_items:
+        #    - "{{ WAS_FP_file }}"
+
+        - name: Extract WAS-FixPack-24 files
+          unarchive:
+            src: "{{ item }}"
+            dest: "{{ temp_dir }}/WAS-Fixpack-24"
+            remote_src: yes
+          with_items:
+             - "{{ temp_dir }}/WAS-Fixpack-24_temp/8.5.5-WS-WAS-FP0000010-part1.zip"
+             - "{{ temp_dir }}/WAS-Fixpack-24_temp/8.5.5-WS-WAS-FP0000010-part2.zip"
+        
+        #- name: Installing Websphere
+          #shell: "{{ item }}"
+          #register: WASServer_Output1
+          #with_items:
+           #- eval {{ temp_dir }}/IM/tools/imcl install com.ibm.websphere.NDTRIAL.v85_8.5.5000.20130514_1044 \
+           #   -repositories {{ temp_dir }}/WAS8.5.5/repository.config \
+           #   -acceptLicense -showProgress \
+           #   -log /tmp/WAS-install.log
+   
+

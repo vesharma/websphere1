@@ -1,0 +1,160 @@
+---
+- name: Install WAS9056_ND
+  hosts: all
+  gather_facts: yes
+  become: yes
+  become_method: sudo
+  vars:
+    Base_dir: /root/WAS-Setup/
+    Was_dir: $Base_dir/WAS
+    WAS_FP: $Base_dir/WAS-Fixpacks
+    IHS: $Base_dir/IHS
+    IHS-plguin: $Base_dir/IHS-Plugin
+    IM: $Base_dir/IM
+    
+
+  tasks:
+    - name: Install unzip
+      yum:
+        name: unzip
+        state: installed
+        
+    - name: Install libnsl for OLE-8
+      yum:
+        name: libnsl
+        state: installed
+      when: (ansible_distribution == "OracleLinux" and ansible_distribution_major_version == '8')
+
+    - name: Check to see if WAS is already installed
+      stat: path="/opt/IBM"
+      register: result_was
+
+    - name: Remove IM if it's already installed
+      shell: "{{ item }}"
+      loop:
+        - mv /opt/IBM /opt/IBM.old
+        - mv /var/ibm /var/ibm.old
+        - mv /etc/.ibm /etc/.ibm.old
+      when: result_was.stat.exists
+
+    - name: Install Websphere 9056
+      block:
+        - name: Create new directories
+          file:
+            path: "{{ item }}"
+            state: directory
+          loop:
+            - /opt/ibm
+            - /home/hudsonadmin/ibm/websphere9056ND_jdk1.8
+
+        - name: Remove existing directories
+          file:
+            path: "{{ item }}"
+            state: absent
+          loop:
+            - "{{ temp_dir }}/WS905_FP6_jdk1.8"      
+            - "{{ temp_dir }}/IBM_IM_1.8.8"
+            - "{{ temp_dir }}/im-1.8.8.zip"
+            - "{{ temp_dir }}/IM"
+
+        - name: Download Websphere install files
+          get_url: 
+            url: http://192.168.88.130/was8.5.5/repo/WAS-Setup/WAS/{was.repo.8550.ndtrial_part1.zip,was.repo.8550.ndtrial_part2.zip,was.repo.8550.ndtrial_part3.zip}
+            dest: "{{ temp_dir }}"
+            tmp_dest: "{{ temp_dir }}"
+            validate_certs: no
+
+        - name: Extract WAS install files
+          unarchive:
+            src: "{{ temp_dir }}/websphere-9.0.5.6-NetworkDeployment.tar"
+            dest: "{{ temp_dir }}"
+            remote_src: yes
+
+        - name: Download IBM 1.8.8 install file
+          get_url:
+            url: http://192.168.88.130/was8.5.5/repo/WAS-Setup/IM/agent.installer.linux.gtk.x86_64_1.9.2005.20230718_1844.zip
+            dest: "{{ temp_dir }}"
+            tmp_dest: "{{ temp_dir }}"
+            validate_certs: no
+
+        - name: Extract IBM install files
+          unarchive:
+            src: "{{ temp_dir }}/im-1.8.8.zip"
+            dest: "{{ temp_dir }}"
+            remote_src: yes
+
+        - name: Extract more files
+          unarchive:
+            src: "{{ temp_dir }}/IBM_IM_1.8.8/agent.installer.linux.gtk.x86_64_1.8.8000.20171130_1105.zip"
+            dest: "{{ temp_dir }}/IBM_IM_1.8.8"
+            remote_src: yes
+
+        - name: Accept license
+          shell: "eval {{ temp_dir }}/IBM_IM_1.8.8/installc -acceptLicense"
+
+
+        - name: Install Refresh Package 5 
+          shell: eval {{ imcl_path }} install com.ibm.websphere.ND.v90_9.0.5000.20190610_1342 \
+             -preferences com.ibm.cic.common.core.preferences.keepFetchedFiles=false \
+             -preferences com.ibm.cic.common.core.preferences.preserveDownloadedArtifacts=false \
+             -repositories  {{ temp_dir }}/WS905_FP6_jdk1.8/WS_9.05_RP  \
+             -showProgress \
+             -installationDirectory {{ install_dir }} \
+             -acceptLicense
+
+        - name: Installing WAS FP6
+          shell: eval {{ imcl_path }} install com.ibm.websphere.ND.v90_9.0.5006.20201109_1605 \
+             -preferences com.ibm.cic.common.core.preferences.keepFetchedFiles=false \
+             -preferences com.ibm.cic.common.core.preferences.preserveDownloadedArtifacts=false \
+             -repositories  {{ temp_dir }}/WS905_FP6_jdk1.8/WS_9.05_FP06/repository.config  \
+             -showProgress \
+             -installationDirectory {{ install_dir }}  \
+             -acceptLicense
+
+        - name: Create WAS Profile Test
+          shell: eval {{ install_dir }}/bin/manageprofiles.sh -create -profileName test
+
+        - name: get new profile
+          shell: /opt/ibm/websphere9056ND_jdk1.8/bin/managesdk.sh  -getNewProfileDefault
+
+        - name: Update the JDK java.security file to include XML DSig in the crypto store (Necessary for KeyBank+Citizen for TCH)
+          lineinfile:
+            path: "{{ install_dir }}/java/8.0/jre/lib/security/java.security"
+            regexp: '^security\.provider\.'
+            state: absent
+
+
+        - name: Change ownership of all WAS files
+          file:
+            path: "{{ install_dir }}"
+            owner: was
+            group: wasgrp
+            mode: '0777'
+            recurse: yes
+
+        - name: Change owner on security file
+          file:
+            path: "{{ install_dir }}/java/8.0/jre/lib/security/java.security"
+            owner: was
+            group: wasgrp
+            mode: '0755'
+
+        - name: Set permissions on /opt/ibm
+          file:
+            path: /opt/ibm
+            mode: 0777
+            recurse: yes
+
+        - name: Remove installation files
+          file:
+            path: "{{ item }}"
+            state: absent
+          loop:
+            - "{{ temp_dir }}/WS905_FP6_jdk1.8"
+            - "{{ temp_dir }}/IBM_IM_1.8.8"
+            - "{{ temp_dir }}/im-1.8.8.zip"
+            - "{{ temp_dir }}/websphere-9.0.5.6-NetworkDeployment.tar"
+            - /opt/IBM
+            - /var/ibm
+            - /etc/.ibm
+
