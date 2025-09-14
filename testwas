@@ -1,0 +1,776 @@
+https://l1pvtl1004.1dc.com:8443/
+
+mkdir -p /appserver/dswebtmp/{IMbinaries,was85,WAS855-FP-26}
+chown -R wasup.web /appserver/dswebtmp/{IMbinaries,was85,WAS855-FP-26}
+chmod -R 775 /appserver
+
+#Installation Manager - IM
+curl -k -v -O -u f8rti4p  https://l1pvtl1004:8443/repository/Middleware_Patching/agent.installer.linux.gtk.x86_64_1.9.1000.20191001_1228.zip -d /appserver/dswebtemp/IMbinaries
+
+#WebSphere 8.5.5
+curl -k -v -O -u f8rti4p https://l1pvtl1004.1dc.com:8443/repository/Middleware_Patching/WAS_ND_V8.5.5_1_OF_3.zip \
+ -O https://l1pvtl1004.1dc.com:8443/repository/Middleware_Patching/WAS_ND_V8.5.5_2_OF_3.zip \
+ -O https://l1pvtl1004.1dc.com:8443/repository/Middleware_Patching/WAS_ND_V8.5.5_3_OF_3.zip 
+
+#WebSphere Latest Fix pack
+curl -k -v -O -u f8rti4p https://l1pvtl1004.1dc.com:8443/repository/Middleware_Patching/8.5.5-WS-WAS-FP026-part1.zip \
+ -O https://l1pvtl1004.1dc.com:8443/repository/Middleware_Patching/8.5.5-WS-WAS-FP026-part2.zip \
+-O https://l1pvtl1004.1dc.com:8443/repository/Middleware_Patching/8.5.5-WS-WAS-FP026-part3.zip 
+
+chmod -R 775 /appserver/dswebtmp/
+chown -R wasup.web /appserver/dswebtmp/
+
+
+
+#go to each directory and run the below command to unzip compress files
+ for i in $ls -l *.zip ;do unzip $i ;done
+
+
+InstallationManager installation .1.9
+
+/appserver/dswebtmp/IMbinaries/userinstc -installationDirectory /appserver/IBM/InstallationManager -dataLocation /appserver/IBM/IMShared -acceptLicense
+ >>
+ Installed com.ibm.cic.agent_1.9.1000.20191001_1228 to the /appserver/IBM/InstallationManager/eclipse directory.
+
+ verify the WAS available package 
+ [wasup@sylc2escapp0001 IMbinaries]$ /appserver/IBM/InstallationManager/eclipse/tools/imcl listAvailablePackages -repositories /appserver/dswebtmp/was85/
+>> com.ibm.websphere.ND.v85_8.5.5000.20130514_1044
+
+Installation of WAS8.5
+/appserver/IBM/InstallationManager/eclipse/tools/imcl install com.ibm.websphere.ND.v85_8.5.5000.20130514_1044 -repositories /appserver/dswebtmp/was85/ -installationDirectory /appserver/WebSphere/AppServer/ -acceptLicense -sVP
+
+>>Validating eclipse configuration for IBM WebSphere Application Server V8.5
+Installed com.ibm.websphere.ND.v85_8.5.5000.20130514_1044 to the /appserver/WebSphere/AppServer/ directory.
+
+
+Verify the available Fixpack 26 
+/appserver/IBM/InstallationManager/eclipse/tools/imcl listAvailablePackages -repositories /appserver/dswebtmp/WAS855-FP-26/
+>>com.ibm.websphere.ND.v85_8.5.5026.20240702_1024
+
+/appserver/IBM/InstallationManager/eclipse/tools/imcl install com.ibm.websphere.ND.v85_8.5.5026.20240702_1024 -installationDirectory /appserver/WebSphere/AppServer/ -repositories /appserver/dswebtmp/WAS855-FP-26  -acceptLicense -preferences com.ibm.cic.common.core.preferences.preserveDownloadedArtifacts="false" -sVP
+
+>> Updated to com.ibm.websphere.ND.v85_8.5.5026.20240702_1024 in the /appserver/WebSphere/AppServer/ directory.
+WARNING:
+The version of Java SE in the WAS_HOME/java directory was updated to Java SE 8.
+
+
+Download SSL CERT
+mkdir -p /appserver/dswebtmp/SSLCERT
+Example : 
+
+curl -k -v -O -u f8rti4p https://l1pvtl1004.1dc.com:8443/repository/Middleware/test6webserver/ess/sylc2escapp0002-node2.zip
+
+[wasup@sylc2escapp0001 ~]$ cd /appserver/dswebtmp/SSLCERT/
+
+in case if we need to delete the existing profile
+  /appserver/WebSphere/AppServer/bin/manageprofiles.sh -delete -profileName Dmgr01
+    /appserver/WebSphere/AppServer/bin/manageprofiles.sh -delete -profileName AppSrv01
+
+profile creation Steps
+
+
+Node1 -have 2 profile
+1. Dmgr01
+2. AppSrv01
+
+#DMGR profile
+ /appserver/WebSphere/AppServer/bin/manageprofiles.sh -create -profileName Dmgr01 -profilePath /appserver/WebSphere/AppServer/profiles/Dmgr01 -templatePath /appserver/WebSphere/AppServer/profileTemplates/management -enableAdminSecurity true -adminUserName wasup -adminPassword dontguess -importPersonalCertKS /appserver/dswebtmp/SSLCERT/sylc2escapp0001-cell.pfx -importPersonalCertKSType PKCS12 -importPersonalCertKSPassword Testme@12345 -importPersonalCertKSAlias sylc2escapp0001-cell
+
+
+>>Output 
+>>
+Mar 27, 2025 10:43:39 AM com.ibm.ffdc.osgi.ProviderTracker AddingService
+INFO: FFDC1007I: FFDC Provider Installed: com.ibm.ffdc.EmptyProvider(silent)
+INSTCONFSUCCESS: Success: Profile Dmgr01 now exists. Please consult /appserver/WebSphere/AppServer/profiles/Dmgr01/logs/AboutThisProfile.txt for more information about this profile
+
+
+
+ cat /appserver/WebSphere/AppServer/profiles/Dmgr01/logs/AboutThisProfile.txt
+
+/appserver/WebSphere/AppServer/profiles/Dmgr01/bin/startManager.sh
+
+>> ADMU0116I: Tool information is being logged in file
+           /appserver/WebSphere/AppServer/profiles/Dmgr01/logs/dmgr/startServer.log
+ADMU0128I: Starting tool with the Dmgr01 profile
+ADMU3100I: Reading configuration for server: dmgr
+ADMU3200I: Server launched. Waiting for initialization status.
+ADMU3000I: Server dmgr open for e-business; process id is 453195
+
+
+# AppServer profile
+# Replace these values
+#/appserver/dswebtmp/CERT-ESS-QA/syle2escwas0001-node1.pfx
+# syle2escwas0001 
+# syle2escwas0001-node1
+
+
+/appserver/WebSphere/AppServer/bin/manageprofiles.sh -create  -templatePath /appserver/WebSphere/AppServer/profileTemplates/managed -importPersonalCertKS /appserver/dswebtmp/SSLCERT/sylc2escapp0001-node1.pfx -importPersonalCertKSType PKCS12 -importPersonalCertKSPassword Testme@12345 -importPersonalCertKSAlias sylc2escapp0001-node1 -dmgrHost sylc2escapp0001.1dc.com -dmgrAdminUserName wasup -dmgrAdminPassword dontguess -profilePath /appserver/WebSphere/AppServer/profiles/AppSrv01 -profileName AppSrv01
+
+
+/appserver/WebSphere/AppServer/profiles/AppSrv01/logs/AboutThisProfile.txt
+
+
+[wasup@sylc2escapp0001 bin]$ pwd
+/appserver/WebSphere/AppServer/profiles/AppSrv01/bin
+wasup@sylc2escapp0001 bin]$ ls -l start*
+-rwxr-xr-x. 1 wasup web 98 Mar 27 10:50 startMWServer.sh
+-rwxr-xr-x. 1 wasup web 94 Mar 27 10:50 startNode.sh
+-rwxr-xr-x. 1 wasup web 96 Mar 27 10:50 startServer.sh
+
+1. /appserver/WebSphere/AppServer/profiles/AppSrv01/bin/startNode.sh
+2. 
+
+
+On Node-2
+
+just create APPSRV01 profile
+
+/appserver/WebSphere/AppServer/bin/manageprofiles.sh -create  -templatePath /appserver/WebSphere/AppServer/profileTemplates/managed -importPersonalCertKS /appserver/dswebtmp/SSLCERT/sylc2escapp0002-node2.pfx -importPersonalCertKSType PKCS12 -importPersonalCertKSPassword Testme@12345 -importPersonalCertKSAlias sylc2escapp0002-node2 -dmgrHost sylc2escapp0001.1dc.com -dmgrAdminUserName wasup -dmgrAdminPassword dontguess -profilePath /appserver/WebSphere/AppServer/profiles/AppSrv01 -profileName AppSrv01
+
+[wasup@qdld2escapp0007 ~]$ cat StartWebserver-DMGR-Step_1.sh
+#!/bin/sh
+
+
+TARGET_USER="wasup"
+
+if [ "$USER" == "$TARGET_USER" ]; then
+   /appserver/WebSphere/AppServer/profiles/Dmgr01/bin/startManager.sh -username wasup -password dontguess
+  # /appserver/WebSphere/AppServer/profiles/AppSrv01/bin/startNode.sh -username wasup -password dontguess
+else
+
+   runuser -l wasup -c '/appserver/WebSphere/AppServer/profiles/Dmgr01/bin/startManager.sh -username wasup -password dontguess'
+   #runuser -l wasup -c '/appserver/WebSphere/AppServer/profiles/AppSrv01/bin/startNode.sh -username wasup -password dontguess'
+fi
+
+
+[wasup@qdld2escapp0007 ~]$ cat StartWebserver-Node-Step_2.sh
+#!/bin/sh
+
+#/appserver/WebSphere/AppServer/profiles/AppSrv01/bin/startMWServer.sh -server qdld2escapp0007
+
+TARGET_USER="wasup"
+
+if [ "$USER" == "$TARGET_USER" ]; then
+  # /appserver/WebSphere/AppServer/profiles/Dmgr01/bin/startManager.sh -username wasup -password dontguess
+   /appserver/WebSphere/AppServer/profiles/AppSrv01/bin/startNode.sh -username wasup -password dontguess
+else
+
+   #runuser -l wasup -c '/appserver/WebSphere/AppServer/profiles/Dmgr01/bin/startManager.sh -username wasup -password dontguess'
+   runuser -l wasup -c '/appserver/WebSphere/AppServer/profiles/AppSrv01/bin/startNode.sh -username wasup -password dontguess'
+fi
+
+
+[wasup@qdld2escapp0007 ~]$ cat StopWebsphere-Nodeagent-Step_3.sh
+#!/bin/sh
+
+/appserver/WebSphere/AppServer/profiles/Dmgr01/bin/stopManager.sh -username wasup -password dontguess
+#/appserver/WebSphere/AppServer/profiles/AppSrv01/bin/stopNode.sh -username wasup -password dontguess
+#kill -9 `ps -ef |grep wasup|awk -F' ' '{print $2}'`
+[wasup@qdld2escapp0007 ~]$ cat StopWebsphere-DMGR-Step-4.sh
+#!/bin/sh
+
+/appserver/WebSphere/AppServer/profiles/Dmgr01/bin/stopManager.sh -username wasup -password dontguess
+#/appserver/WebSphere/AppServer/profiles/AppSrv01/bin/stopNode.sh -username wasup -password dontguess
+#kill -9 `ps -ef |grep wasup|awk -F' ' '{print $2}'`
+
+
+
+
+
+[wasup@qdld2escapp0007 ~]$ cat StopWebsphere-DMGR.sh
+#!/bin/sh
+
+/appserver/WebSphere/AppServer/profiles/Dmgr01/bin/stopManager.sh -username wasup -password dontguess
+#/appserver/WebSphere/AppServer/profiles/AppSrv01/bin/stopNode.sh -username wasup -password dontguess
+#kill -9 `ps -ef |grep wasup|awk -F' ' '{print $2}'`
+[wasup@qdld2escapp0007 ~]$ cat StopWebsphere-Nodeagent.sh
+#!/bin/sh
+
+/appserver/WebSphere/AppServer/profiles/Dmgr01/bin/stopManager.sh -username wasup -password dontguess
+#/appserver/WebSphere/AppServer/profiles/AppSrv01/bin/stopNode.sh -username wasup -password dontguess
+#kill -9 `ps -ef |grep wasup|awk -F' ' '{print $2}'`
+
+
+
+
+
+
+
+
+
+
+[wasup@sylc2escapp0001 ~]$ cat StartWebsphere.sh
+#!/bin/sh
+
+/appserver/WebSphere/AppServer/profiles/Dmgr01/bin/startManager.sh -username wasup -password dontguess
+/appserver/WebSphere/AppServer/profiles/AppSrv01/bin/startNode.sh -username wasup -password dontguess
+[wasup@sylc2escapp0001 ~]$
+[wasup@sylc2escapp0001 ~]$
+[wasup@sylc2escapp0001 ~]$ cat StopWebsphere.sh
+#!/bin/sh
+
+/appserver/WebSphere/AppServer/profiles/AppSrv01/bin/stopNode.sh -username wasup -password dontguess
+/appserver/WebSphere/AppServer/profiles/Dmgr01/bin/stopManager.sh -username wasup -password dontguess
+
+
+
+[wasup@syle2escwas0001 IMbinaries]$ /appserver/IBM/InstallationManager/eclipse/tools/imcl listInstalledPackages
+com.ibm.cic.agent_1.8.8000.20171130_1105
+com.ibm.websphere.ND.v85_8.5.5023.20230116_1145
+[wasup@syle2escwas0001 IMbinaries]$
+
+
+for webspher console.
+/appserver/WebSphere/AppServer/profiles/Dmgr01/bin/startManager.sh
+
+For Node agent
+/appserver/WebSphere/AppServer/profiles/AppSrv01/bin/stopNode.sh
+/appserver/WebSphere/AppServer/profiles/AppSrv01/bin/startNode.sh
+logs
+ tail -f /appserver/WebSphere/AppServer/profiles/AppSrv01/logs/nodeagent/startServer.log
+ 
+ 
+for cluster up
+/appserver/WebSphere/AppServer/profiles/AppSrv01/bin/stopServer.sh ESS_Security_Cluster_Dev_m1
+/appserver/WebSphere/AppServer/profiles/AppSrv01/bin/startServer.sh ESS_Security_Cluster_Dev_m1
+
+for logs
+tail -f /appserver/WebSphere/AppServer/profiles/AppSrv01/logs/ESS_Security_Cluster_Dev_m1/SystemOut.log
+
+/28/25 10:41:10:542 UTC] 00000001 WsServerImpl  A   WSVR0001I: Server ESS_Security_Cluster_Dev_m1 open for e-business
+[1/28/25 10:41:10:546 UTC] 000000aa P2PGroup      I   ODCF8040I: Detected process qdld2escapp0007Cell01\qdld2escapp0007CellManager01\dmgr started.
+[1/28/25 10:41:10:547 UTC] 000000aa P2PGroup      I   ODCF8040I: Detected process qdld2escapp0007Cell01\qdld2escapp0007Node01\nodeagent started.
+[1/28/25 10:41:13:029 UTC] 00000053 NGUtil$Server I   ASND0002I: Detected server dmgr started on node qdld2escapp0007CellManager01
+
+
+/appserver/WebSphere/AppServer/profiles/AppSrv01/bin/stopMWServer.sh -server ESS_Security_Cluster_Dev_m1
+/appserver/WebSphere/AppServer/profiles/AppSrv01/bin/startMWServer.sh -server ESS_Security_Cluster_Dev_m1
+
+
+
+
+ ps -ef |grep java
+/appserver/IBM/InstallationManager/eclipse/tools/imcl listInstalledPackages
+
+/appserver/IBM/InstallationManager/eclipse/tools/imcl uninstall com.ibm.websphere.ND.v85_8.5.5023.20230116_1145
+
+/appserver/IBM/InstallationManager/eclipse/tools/imcl uninstall com.ibm.cic.agent_1.8.8000.20171130_1105
+
+
+
+Websphere node
+WAS-DMGR
+firewall-cmd --add-port={7060,7277,8879,9043,9060,9100,9352,9401,9402,9403,9420,9632,9809,11005,11006}/tcp --permanent
+WAS-NODE
+firewall-cmd --add-port={2809,5000,5001,7062,7272,8878,9201,9202,9353,9629,9900,9901,11003,11004}/tcp --permanent
+firewall-cmd --reload
+
+
+firewall-cmd --add-port={9810,8880,9101,9404,9405,9406,9061,9080,9354,9044,9443,5060,5061,11007,11008,9633,7276,7286,5558,5578,8879}/tcp --permanent
+firewall-cmd --add-port={2809,9900,9202,9201,935272,5001,5000,9901,8878,9629,7062,11004,1003}/tcp --permanent
+
+
+firewall-cmd --reload
+
+IHS
+sudo sudo firewall-cmd --permanent --add-port={8008,8779,7083,7446,7084,7447,7085,7448,7089,7449,7090,7450,7093,7080}/tcp
+sudo firewall-cmd --reload
+
+
+
+BOOTSTRAP_ADDRESS	9810
+SOAP_CONNECTOR_ADDRESS	8880
+ORB_LISTENER_ADDRESS	9101
+SAS_SSL_SERVERAUTH_LISTENER_ADDRESS	9404
+CSIV2_SSL_SERVERAUTH_LISTENER_ADDRESS	9405
+CSIV2_SSL_MUTUALAUTH_LISTENER_ADDRESS	9406
+WC_adminhost	9061
+WC_defaulthost	9080
+DCS_UNICAST_ADDRESS	9354
+WC_adminhost_secure	9044
+WC_defaulthost_secure	9443
+SIP_DEFAULTHOST	5060
+SIP_DEFAULTHOST_SECURE	5061
+OVERLAY_UDP_LISTENER_ADDRESS	11007
+OVERLAY_TCP_LISTENER_ADDRESS	11008
+IPC_CONNECTOR_ADDRESS	9633
+SIB_ENDPOINT_ADDRESS	7276
+SIB_ENDPOINT_SECURE_ADDRESS	7286
+SIB_MQ_ENDPOINT_ADDRESS	5558
+SIB_MQ_ENDPOINT_SECURE_ADDRESS	5578
+
+
+
+[wasup@sylc2escapp0001 ~]$ cat StartWebsphere.sh
+#!/bin/sh
+
+
+#chmod -R 775 /appserver/WebSphere /appserver/ess /appserver/admin
+#chown -R wasup.web /appserver/WebSphere /appserver/ess /appserver/admin
+
+/appserver/WebSphere/AppServer/profiles/AppSrv01/bin/startNode.sh
+/appserver/WebSphere/AppServer/profiles/Dmgr01/bin/startManager.sh -username wasup -password dontguess
+
+/appserver/WebSphere/AppServer/profiles/AppSrv01/bin/startMWServer.sh -server ess_c_cluster_m1 -username wasup -password dontgues
+[wasup@sylc2escapp0001 ~]$
+[wasup@sylc2escapp0001 ~]$
+
+[wasup@qdld2escapp0007 ~]$ cat StartWebSphere_node.sh
+#!/bin/sh
+
+TARGET_USER="wasup"
+
+if [ "$USER" == "$TARGET_USER" ]; then
+   /appserver/WebSphere/AppServer/profiles/AppSrv01/bin/startNode.sh -username wasup -password dontguess
+else
+ runuser -l wasup -c '/appserver/WebSphere/AppServer/profiles/AppSrv01/bin/startNode.sh -username wasup -password dontguess'
+fi
+
+:wq
+
+[wasup@sylc2escapp0001 ~]$ cat StopWebsphere.sh
+#!/bin/sh
+
+TARGET_USER="wasup"
+
+if [ "$USER" == "$TARGET_USER" ]; then
+   /appserver/WebSphere/AppServer/profiles/AppSrv01/bin/stopNode.sh -username wasup -password dontguess
+else
+ runuser -l wasup -c '/appserver/WebSphere/AppServer/profiles/AppSrv01/bin/stopNode.sh -username wasup -password dontguess'
+fi
+
+
+
+
+startup script
+[root@sylc2escapp0001 ~]# cat WAS_8.5.service
+[Unit]
+Description=WAS8.5 service
+After=network.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=1
+User=wasup
+ExecStart=/usr/bin/sh /appserver/StartWebsphere.sh
+
+[Install]
+WantedBy=multi-user.target
+
+
+
+------------
+
+https://www.ibm.com/support/pages/3-ways-resolve-cwrls0030w
+ 
+To create the customer property:
+	• Click Servers => Server Types, and either WebSphere application servers => server_name => Under Server Infrastructure, click Java and process management => Process definition => Java virtual machine => Custom properties => New
+	• Enter com.ibm.ws.recoverylog.disableNonHARegistration in Name Field and true in Value field
+	• Save, Sync the changes and restart the servers
+ 
+o create the customer property:
+	• Click on Servers => Core Groups => Core group settings => CORE_GROUP_NAME => Custom properties => New
+	• Enter IBM_CS_OOM_ACTION in Name Field and Isolate in Value field
+	• Save, Sync the changes and restart the servers
+	•  
+ 
+----------------
+If node agent is not showing active in websphere console --> node 
+then add 8879 port in firewall cmd and restart the node agent
+
+
+
+Issue -
+When Second WAS nodeagent is not registering or starting in Websphere console.
+use fqdn name of second node 
+Try this.
+/appserver/WebSphere/AppServer/bin/manageprofiles.sh -create  -templatePath /appserver/WebSphere/AppServer/profileTemplates/managed -importPersonalCertKS /appserver/dswebtmp/SSLCERT/qdlf2escwas0004.1dc.com.pfx -importPersonalCertKSType PKCS12 -importPersonalCertKSPassword Welcomeess@123 -importPersonalCertKSAlias qdlf2escwas0004_node  -dmgrHost  qdlf2escwas0003.1dc.com -dmgrPort 8879 -dmgrAdminUserName wasup -dmgrAdminPassword dontguess -profilePath /appserver/WebSphere/AppServer/profiles/AppSrv01 -profileName AppSrv01 -federateLater false -hostName qdlf2escwas0004.1dc.com
+
+----------
+
+if profiles are already exist and you want to remove it .
+/appserver/WebSphere/AppServer/bin/manageprofiles.sh -listProfiles
+/appserver/WebSphere/AppServer/bin/manageprofiles.sh -validateAndUpdateRegistry
+
+/appserver/WebSphere/AppServer/bin/manageprofiles.sh -deleteAll
+INSTCONFSUCCESS: Success: All profiles are deleted.
+[wasup@qdlf2escwas0004 CERT] profiles $ rm -rf *
+
+
+
+-----------
+if you want to uninstall the WAS 
+
+[wasup@sylp2escwas0004 PROD] profiles $ /appserver/IBM/InstallationManager/eclipse/tools/imcl listinstalledpackages
+com.ibm.cic.agent_1.9.1000.20191001_1228
+com.ibm.websphere.ND.v85_8.5.5026.20240702_1024     <-------WAS 8.5.5 verision after patching FP26 
+
+ /appserver/IBM/InstallationManager/eclipse/tools/imcl uninstall com.ibm.websphere.ND.v85_8.5.5026.20240702_1024
+
+
+
+
+
+----------
+in case of SAN certificate import failed or node agent failed to start
+Add cell and node alias in SSL certificate  
+Reference - sylc2emewas.1dc.com
+DNS
+sylc2emewas0001.1dc.com
+sylc2emewas0002.1dc.com
+sylc2emewas0001
+sylc2emewas0002
+sylc2emewas0001-cell
+sylc2emewas0001-node1
+sylc2emewas0002-node2
+sylc2emewas.1dc.com
+
+then below command to add profile.
+DMGR profile create.
+
+/appserver/WebSphere/AppServer/bin/manageprofiles.sh -create -profileName Dmgr01 -profilePath /appserver/WebSphere/AppServer/profiles/Dmgr01 -templatePath /appserver/WebSphere/AppServer/profileTemplates/management -enableAdminSecurity true -adminUserName wasup -adminPassword dontguess -importPersonalCertKS /appserver/WebSphere/AppServer/Certs/sylc2emewas.1dc.com.pfx -importPersonalCertKSType PKCS12 -importPersonalCertKSPassword 4Fiserv2025! -importPersonalCertKSAlias sylc2emewas.1dc.com
+
+
+curl -k -v -O -u f8rti4p https://l1pvtl1004.1dc.com:8443/repository/Middleware/test6webserver/sylc2emewas.1dc.com.pfx
+
+openssl pkcs12 -in sylc2emsdfewas.oned.com.pfx -passin pass:4Fiserv2025! -passout pass:4Fiserv2025! -info -nokeys -clcerts 2>/dev/null | sed -n '/-----BEGIN CERTIFICATE-----/,/-----END CERTIFICATE-----/p' > sylc2emewas.1dc.com.cer
+
+openssl x509 -in sylc2emsdfewas.oned.cer -text -noout
+
+
+/appserver/WebSphere/AppServer/bin/manageprofiles.sh -create  -templatePath /appserver/WebSphere/AppServer/profileTemplates/managed -importPersonalCertKS /appserver/WebSphere/AppServer/Certs/sylc2emewas.1dc.com.pfx -importPersonalCertKSType PKCS12 -importPersonalCertKSPassword 4Fiserv2025! -importPersonalCertKSAlias sylc2emewas.1dc.com -dmgrHost sylc21.1dc.com -dmgrAdminUserName wasup -dmgrAdminPassword dontguess -profilePath /appserver/WebSphere/AppServer/profiles/AppSrv01 -profileName AppSrv01
+
+
+ /appserver/WebSphere/AppServer/bin/manageprofiles.sh -create  -templatePath /appserver/WebSphere/AppServer/profileTemplates/managed -importPersonalCertKS /appserver/WebSphere/AppServer/Certs/sylc2emewas.1dc.com.pfx -importPersonalCertKSType PKCS12 -importPersonalCertKSPassword 4Fiserv2025! -importPersonalCertKSAlias sylc2emewas.1dc.com -dmgrHost sylc1.1dc.com -dmgrAdminUserName wasup -dmgrAdminPassword dontguess -profilePath /appserver/WebSphere/AppServer/profiles/AppSrv01 -profileName AppSrv01
+
+
+
+#Node2
+/appserver/WebSphere/AppServer/bin/manageprofiles.sh -create  -templatePath /appserver/WebSphere/AppServer/profileTemplates/managed -importPersonalCertKS /appserver/WebSphere/AppServer/Certs/sylc2emewas.1dc.com.pfx -importPersonalCertKSType PKCS12 -importPersonalCertKSPassword 4Fiserv2025! -importPersonalCertKSAlias sylc2emewas.1dc.com -dmgrHost sylc2emewas0001.1dc.com -dmgrAdminUserName wasup -dmgrAdminPassword dontguess -profilePath /appserver/WebSphere/AppServer/profiles/AppSrv01 -profileName AppSrv01
+
+
+
+------------
+ihs
+
+mkdir -p /web/dswebtmp/{IMbinaries,ihs,ihs_FP26}
+chown -R wasup.web /web/dswebtmp/{IMbinaries,ihs,ihs_FP26}
+chmod -R 775 /web/
+
+#Installation Manager - IM
+curl -k -v -O -u f8rti4p  https://l1pvtl1004:8443/repository/Middleware_Patching/agent.installer.linux.gtk.x86_64_1.9.1000.20191001_1228.zip
+
+
+
+curl -k -v -O -u f8rti4p https://l1pvtl1004:8443/repository/Middleware_Patching/WAS_V8.5.5_SUPPL_1_OF_3.zip \
+-O https://l1pvtl1004:8443/repository/Middleware_Patching/WAS_V8.5.5_SUPPL_2_OF_3.zip \
+-O https://l1pvtl1004:8443/repository/Middleware_Patching/WAS_V8.5.5_SUPPL_3_OF_3.zip
+
+curl -k -v -O -u f8rti4p https://l1pvtl1004.1dc.com:8443/repository/Middleware_Patching/8.5.5-WS-WASSupplements-FP026-part1.zip \
+-O https://l1pvtl1004.1dc.com:8443/repository/Middleware_Patching/8.5.5-WS-WASSupplements-FP026-part2.zip \
+-O https://l1pvtl1004.1dc.com:8443/repository/Middleware_Patching/8.5.5-WS-WASSupplements-FP026-part3.zip
+
+
+
+Extract the compress file by enter in location and then run for loop command.
+cd /web/dswebtmp/IMbinaries
+for i in $ls -l *.zip ;do unzip $i ;done
+
+
+unzip agent.installer.linux.gtk.x86_64_1.9.1000.20191001_1228.zip
+Installation of Installation Manager
+ /web/dswebtmp/IMbinaries/userinstc -installationDirectory /web/IBM/InstallationManager -dataLocation /web/IBM/IMShared -acceptLicense
+
+>> Installed com.ibm.cic.agent_1.9.1000.20191001_1228 to the /web/IBM/InstallationManager/eclipse directory.
+
+[wasup@sylc2escihs0002 IMbinaries]$ /web/dswebtmp/IMbinaries/userinstc -installationDirectory /web/IBM/InstallationManager -dataLocation /web/IBM/IMShared -acceptLicense
+Installed com.ibm.cic.agent_1.9.1000.20191001_1228 to the /web/IBM/InstallationManager/eclipse directory.
+
+Validate the 
+/web/IBM/InstallationManager/eclipse/tools/imcl listInstalledPackages  
+
+[wasup@sylp2escihs0002 dswebtmp]$ /web/IBM/InstallationManager/eclipse/tools/imcl listAvailablePackages -repositories /web/dswebtmp/ihs
+com.ibm.websphere.APPCLIENT.v85_8.5.5000.20130514_1044
+com.ibm.websphere.IHS.v85_8.5.5000.20130514_1044
+com.ibm.websphere.PLG.v85_8.5.5000.20130514_1044
+com.ibm.websphere.PLUGCLIENT.v85_8.5.5000.20130514_1044
+com.ibm.websphere.WCT.v85_8.5.5000.20130514_1044
+[wasup@sylp2escihs0002 dswebtmp]$
+
+
+#Install Base IBM HTTPServer
+/web/IBM/InstallationManager/eclipse/tools/imcl install com.ibm.websphere.IHS.v85_8.5.5000.20130514_1044 -installationDirectory  /web/HTTPServer/  -repositories  /web/dswebtmp/ihs/ -acceptLicense -preferences com.ibm.cic.common.core.preferences.preserveDownloadedArtifacts=false -properties user.ihs.allowNonRootSilentInstall=true,user.ihs.httpPort=80 -svP
+
+ 
+#Install Base Plugin
+/web/IBM/InstallationManager/eclipse/tools/imcl install com.ibm.websphere.PLG.v85_8.5.5000.20130514_1044 -installationDirectory  /web/WebSphere/Plugins/  -repositories  /web/dswebtmp/ihs -acceptLicense -preferences com.ibm.cic.common.core.preferences.preserveDownloadedArtifacts=false -properties user.ihs.allowNonRootSilentInstall=true -svP
+
+ 
+
+[wasup@sylc2escihs0004 ihs]$ /web/IBM/InstallationManager/eclipse/tools/imcl listInstalledPackages
+com.ibm.cic.agent_1.9.1000.20191001_1228
+com.ibm.websphere.IHS.v85_8.5.5000.20130514_1044
+com.ibm.websphere.PLG.v85_8.5.5000.20130514_1044
+
+
+[wasup@sylp2escihs0001 dswebtmp]$ /web/IBM/InstallationManager/eclipse/tools/imcl  listAvailablePackages -repositories  /web/dswebtmp/ihs_FP26
+com.ibm.websphere.APPCLIENT.v85_8.5.5026.20240702_1024
+com.ibm.websphere.APPCLIENTILAN.v85_8.5.5026.20240702_1024
+com.ibm.websphere.IHS.v85_8.5.5026.20240702_1024
+com.ibm.websphere.IHSILAN.v85_8.5.5026.20240702_1024
+com.ibm.websphere.PLG.v85_8.5.5026.20240702_1024
+com.ibm.websphere.PLGILAN.v85_8.5.5026.20240702_1024
+com.ibm.websphere.PLUGCLIENT.v85_8.5.5026.20240702_1024
+com.ibm.websphere.PLUGCLIENTILAN.v85_8.5.5026.20240702_1024
+[wasup@sylp2escihs0001 dswebtmp]$
+
+
+/web/IBM/InstallationManager/eclipse/tools/imcl  listAvailablePackages -repositories  /web/dswebtmp/ihs_FP26
+/web/IBM/InstallationManager/eclipse/tools/imcl install com.ibm.websphere.IHS.v85_8.5.5026.20240702_1024 -installationDirectory  /web/HTTPServer/  -repositories  /web/dswebtmp/ihs_FP26 -acceptLicense -preferences com.ibm.cic.common.core.preferences.preserveDownloadedArtifacts=false -properties user.ihs.allowNonRootSilentInstall=true  -svP
+
+/web/IBM/InstallationManager/eclipse/tools/imcl install com.ibm.websphere.PLG.v85_8.5.5026.20240702_1024 -installationDirectory  /web/WebSphere/Plugins/   -repositories  /web/dswebtmp/ihs_FP26 -acceptLicense -preferences com.ibm.cic.common.core.preferences.preserveDownloadedArtifacts=false -properties user.ihs.allowNonRootSilentInstall=true -svP
+
+
+# /web/HTTPServer/bin/htpasswd -c admin.passwd wasup
+/web/HTTPServer/bin/apachectl  -k start -f /web/HTTPServer/conf/dev_ess_spendtrend02/httpd.conf
+/web/HTTPServer/bin/apachectl  -k start -f /web/HTTPServer/conf/admin.conf
+
+
+#!/bin/sh
+
+ps -ef |grep wasup|awk -F ' ' '{print $2}'
+/appserver/WebSphere/AppServer/profiles/AppSrv01/bin/stopServer.sh ess_qa_cluster_m2 -username wasup -password dontguess
+/appserver/WebSphere/AppServer/profiles/AppSrv01/bin/stopManager.sh -username wasup -password dontguess
+/appserver/WebSphere/AppServer/profiles/AppSrv01/bin/stopNode.sh -username wasup -password dontguess
+kill -9 `ps -ef |grep wasup|awk -F ' ' '{print $2}'`
+/appserver/IBM/InstallationManager/eclipse/tools/imcl uninstall com.ibm.websphere.ND.v85_8.5.5023.20230116_1145
+/appserver/IBM/InstallationManager/eclipse/tools/imcl uninstall com.ibm.websphere.ND.v85_8.5.5000.20130514_1044 
+/appserver/IBM/InstallationManager/eclipse/tools/imcl uninstall com.ibm.cic.agent_1.8.8000.20171130_1105
+
+exit
+
+[wasup@sylc2escihs0002 ~]$ cat httpd-Start-admin.sh
+#!/bin/sh
+
+/web/HTTPServer/bin/apachectl -d /web/HTTPServer -k start -f /web/HTTPServer/conf/admin_common/admin.conf
+ ps -ef |grep httpd
+
+[wasup@sylc2escihs0002 ~]$ cat httpd-Start-cat.sh
+#!/bin/sh
+
+#/web/HTTPServer/bin/apachectl -d /web/HTTPServer -k start -f /web/HTTPServer/conf/admin_common/admin.conf
+/web/HTTPServer/bin/apachectl -d /web/HTTPServer -k start -f /web/HTTPServer/conf/cat_ess_m1/httpd.conf
+ ps -ef |grep httpd
+
+[wasup@sylc2escihs0002 ~]$ cat httpd-Stop-admin.sh
+#!/bin/sh
+
+
+/web/HTTPServer/bin/apachectl -d /web/HTTPServer -k stop  -f /web/HTTPServer/conf/admin_common/admin.conf
+
+psvar=`ps -ef |grep 'httpd'| grep 'admin_common' |awk -F ' ' '{print $2}'`
+
+for i in $psvar
+   do
+           echo $i
+           kill -9 $i
+  done
+
+  ps -ef |grep httpd
+  exit
+
+[wasup@sylc2escihs0002 ~]$ cat httpd-Stop-cat.sh
+#!/bin/sh
+
+
+/web/HTTPServer/bin/apachectl -d /web/HTTPServer -k stop  -f /web/HTTPServer/conf/cat_ess_m1/httpd.conf
+
+psvar=`ps -ef |grep 'httpd'| grep 'cat_ess_m1' |awk -F ' ' '{print $2}'`
+
+for i in $psvar
+   do
+           echo $i
+           kill -9 $i
+  done
+
+  ps -ef |grep httpd
+  exit
+
+
+
+IHS
+sudo sudo firewall-cmd --permanent --add-port={8008,7083,7446,7083,7084,7447,7085,7448,7089,7449,7090,7450,7093,7080}/tcp
+sudo firewall-cmd --reload
+
+
+Log into one of the Ansible Admin servers:
+
+Copy "ansible" scripts to you homedir and install IHS
+vi and add the server names in the "ihs_inventory" 
+           vi /home/yourHomeDir/ansible/ansible-misc/ihs_8_5_5_installation/ihs_inventory
+
+          
+
+
+
+save
+
+:wq!
+
+run the following command:
+           sudo ansible-playbook -i ihs_inventory ihs.yaml -bu ansible --private-key=/home/ansible/.ssh/id_rsa
+
+Install updates:
+          vi /home/homedir/ansible/ansible-misc/ihs_8_5_5_23_update/serverstoupdate
+
+   Add host name
+
+
+
+Save
+
+:wq!
+
+Run the following command:
+            sudo ansible-playbook -i serverstoupdate ihs_update_8.5.5.23.yml -bu ansible --private-key=/home/ansible/.ssh/id_rsa
+
+
+
+Now logon to the host server
+
+           sudo su - wasup
+
+Got to following location to add the port 8008
+cd /web/HTTPServer/conf
+
+vi admin.conf
+
+
+Type the following command to search for the listening port. Change @@AdminPort@@ to 8008 (these port need to be open)
+           :/Listen 
+
+press the Shift+I buttons on the keyboard to enable the "Insert Mode"
+
+
+
+
+
+
+Search for "ServerName" and add the port 8008 
+
+
+
+
+Save changes  
+           :wq!
+
+
+
+Setup the Web server port 7080 for connecting the Web console:
+
+Go to
+           /web/HTTPServer/conf 
+
+           vi httpd.conf
+
+
+
+Change it to 7080
+
+
+
+Save changes
+
+:wq!
+
+
+
+Go to the following and perform the Post-Install steps:
+           /web/HTTPServer/bin
+
+Run 
+          ./postinst -i $PWD -t setupadm -v ADMINPORT=8008 -v SETUPADMUSER=ihsadmin -v SETUPADMGROUP=ihsgroup
+
+
+
+It should look like this:
+
+
+
+
+
+Run the following command:
+           ./htpasswd -c /web/HTTPServer/conf/admin.passwd ihsadmin
+
+            Choose a password 
+
+
+
+
+
+Create the following directory (if does not exist)
+           Server_Name_Here_WebServer e.g (ralt2rudihs0002_WebServer)
+
+           mkdir -p /web/WebSphere/Plugins/config/ralt2rudihs0002_WebServer/
+
+Create empty file using the "touch" command
+           touch /web/WebSphere/Plugins/config/server_name_WebServer/plugin-cfg.xml
+
+Run for local service account (not for IdM):
+          /web/HTTPServer/bin/setupadm -usr wasup -grp web -cfg /web/HTTPServer/conf/httpd.conf -plg /web/WebSphere/Plugins/config/server_name_WebServer/plugin-cfg.xml -adm /web/HTTPServer/conf/admin.conf
+
+Start the service (For service accounts managed by IdM you can simply start the service while logged in as the service account)
+          /web/HTTPServer/bin/apachectl -k start -f /web/HTTPServer/conf/admin.conf
+
+          or
+
+         /web/HTTPServer/bin/adminctl start
+
+Check if running: ps -ef | grep http or ss -plnt
+
+
+[wasup@sylp2escihs0001 web]$ cat Startup-ess_prod_web_m1_ihs.sh
+#!/bin/sh
+
+TARGET_USER="wasup"
+
+if [ "$USER" == "$TARGET_USER" ]; then
+   /web/HTTPServer/bin/apachectl -d /web/HTTPServer -k start -f /web/HTTPServer/conf/ess_prod_web_m1/httpd.conf
+else
+ runuser -l wasup -c '/web/HTTPServer/bin/apachectl -d /web/HTTPServer -k start -f /web/HTTPServer/conf/ess_prod_web_m1/httpd.conf'
+fi
+
+
+[wasup@sylp2escihs0001 web]$ cat Startup-ess_prod_web_2_m1_ihs.sh
+#!/bin/sh
+/web/HTTPServer/bin/apachectl -d /web/HTTPServer -k start -f /web/HTTPServer/conf/ess_prod_web_2_m1/httpd.conf
+
+
+TARGET_USER="wasup"
+
+if [ "$USER" == "$TARGET_USER" ]; then
+   /web/HTTPServer/bin/apachectl -d /web/HTTPServer -k start -f /web/HTTPServer/conf/ess_prod_web_2_m1/httpd.conf
+else
+ runuser -l wasup -c '/web/HTTPServer/bin/apachectl -d /web/HTTPServer -k start -f /web/HTTPServer/conf/ess_prod_web_2_m1/httpd.conf'
+fi
+
+
+[wasup@sylp2escihs0001 web]$ cat Startup-admin_ihs.sh
+#!/bin/sh
+
+TARGET_USER="wasup"
+
+if [ "$USER" == "$TARGET_USER" ]; then
+   /web/HTTPServer/bin/apachectl -d /web/HTTPServer -k start -f /web/HTTPServer/conf/admin_common/admin.conf
+else
+ runuser -l wasup -c '/web/HTTPServer/bin/apachectl -d /web/HTTPServer -k start -f /web/HTTPServer/conf/admin_common/admin.conf'
+fi
+
+
+
+chmod +x Startup-ess_prod_web_2_m1_ihs.sh Startup-ess_prod_web_m1_ihs.sh Startup-admin_ihs.sh
+
+
+
